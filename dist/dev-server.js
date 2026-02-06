@@ -3,6 +3,9 @@ import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, extname, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const pkg = require(join(dirname(fileURLToPath(import.meta.url)), '../package.json'));
 import { WebSocketServer } from 'ws';
 import chokidar from 'chokidar';
 import { transform } from 'esbuild';
@@ -60,10 +63,13 @@ export class DevServer {
         this.wss = new WebSocketServer({ server: this.httpServer });
         this.wss.on('connection', (ws) => {
             this.clients.add(ws);
-            this.log('WebSocket client connected');
+            const c = { dim: '\x1b[2m', green: '\x1b[32m', reset: '\x1b[0m' };
+            console.log(`${c.dim}[HMR]${c.reset} ${c.green}client connected${c.reset} (${this.clients.size} total)`);
             ws.on('close', () => {
                 this.clients.delete(ws);
-                this.log('WebSocket client disconnected');
+                if (this.verbose) {
+                    console.log(`${c.dim}[HMR]${c.reset} client disconnected`);
+                }
             });
         });
         this.watcher = chokidar.watch(this.root, {
@@ -71,10 +77,22 @@ export class DevServer {
             ignoreInitial: true,
         });
         this.watcher.on('change', this.handleFileChange.bind(this));
+        const startTime = Date.now();
         return new Promise((resolve) => {
             this.httpServer.listen(this.port, this.host, () => {
-                const url = `http://localhost:${this.port}`;
-                console.log(`\n  mini-dev dev server running at ${url}\n`);
+                const readyMs = Date.now() - startTime;
+                const url = `http://localhost:${this.port}/`;
+                const c = {
+                    dim: '\x1b[2m',
+                    cyan: '\x1b[36m',
+                    green: '\x1b[32m',
+                    bold: '\x1b[1m',
+                    reset: '\x1b[0m',
+                };
+                const version = pkg.version ?? '0.0.1';
+                console.log(`\n${c.bold}${c.cyan}  mini-dev${c.reset} v${version} ${c.dim}ready in ${readyMs}ms${c.reset}\n\n` +
+                    `${c.green}  ➜${c.reset}  ${c.dim}Local:${c.reset}   ${url}\n` +
+                    `${c.green}  ➜${c.reset}  ${c.dim}Network:${c.reset} use --host to expose\n`);
                 resolve({ port: this.port, url });
             });
         });
@@ -222,13 +240,13 @@ export class DevServer {
             }
             return `import '${path}'`;
         });
-        // Inject HMR accept
-        code += `
-
-if (typeof import.meta !== 'undefined' && import.meta.hot) {
-  import.meta.hot.accept();
+        // Inject HMR context at start (so import.meta.hot exists before user code runs)
+        const hmrInject = `
+if (typeof window !== 'undefined' && window.__MINI_DEV_HOT__) {
+  import.meta.hot = window.__MINI_DEV_HOT__(import.meta.url);
 }
 `;
+        code = hmrInject.trim() + '\n' + code;
         return code;
     }
     resolveImportPath(path, importerDir, importerPath) {
@@ -291,12 +309,14 @@ if (typeof import.meta !== 'undefined' && import.meta.hot) {
         const relative = file.replace(this.root, '').replace(/\\/g, '/');
         const url = relative.startsWith('/') ? relative : '/' + relative;
         this.moduleGraph.delete(url);
-        this.log('File changed:', url);
-        this.broadcast({
-            type: 'update',
-            path: url,
-            timestamp: Date.now(),
-        });
+        const c = { dim: '\x1b[2m', cyan: '\x1b[36m', yellow: '\x1b[33m', reset: '\x1b[0m' };
+        console.log(`${c.dim}[HMR]${c.reset} ${c.yellow}file changed${c.reset} ${c.cyan}${url}${c.reset}`);
+        const msg = { type: 'update', path: url, timestamp: Date.now() };
+        this.broadcast(msg);
+        const n = this.clients.size;
+        if (n > 0) {
+            console.log(`${c.dim}[HMR]${c.reset} update sent to ${n} client${n === 1 ? '' : 's'}`);
+        }
     }
     broadcast(message) {
         const data = JSON.stringify(message);

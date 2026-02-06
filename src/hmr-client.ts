@@ -1,8 +1,8 @@
 /**
  * HMR client script injected into HTML pages.
- * Runs in the browser and handles hot module replacement.
+ * Auto-injects HMR: re-imports entry on .ts/.tsx change, swaps CSS links.
  */
-export function getHMRClient(wsProtocol: string): string {
+export function getHMRClient(_wsProtocol: string): string {
   return `
 (function() {
   const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -12,47 +12,83 @@ export function getHMRClient(wsProtocol: string): string {
   socket.onclose = () => console.log('[mini-dev] HMR disconnected');
   socket.onerror = (e) => console.error('[mini-dev] HMR error', e);
 
-  const hotModuleMap = new Map();
+  function getEntryUrl() {
+    const scripts = document.querySelectorAll('script[type="module"][src]');
+    for (const s of scripts) {
+      if (s.src && !s.src.includes('@hmr-client')) {
+        try { return new URL(s.src).pathname; } catch { return s.src; }
+      }
+    }
+    return null;
+  }
+
+  const acceptors = new Map();
+  function resolvePath(moduleUrl, dep) {
+    try { return new URL(dep, moduleUrl.replace(/[^/]+$/, '') + '/').pathname; } catch { return dep.startsWith('/') ? dep : '/' + dep; }
+  }
+
+  window.__MINI_DEV_HOT__ = function(moduleUrl) {
+    return {
+      accept(deps, callback) {
+        if (typeof deps === 'function') { callback = deps; deps = [moduleUrl]; }
+        else if (typeof deps === 'string') { deps = [resolvePath(moduleUrl, deps)]; }
+        else if (Array.isArray(deps)) { deps = deps.map(d => resolvePath(moduleUrl, d)); }
+        else { deps = [moduleUrl]; }
+        for (const p of deps) {
+          const list = acceptors.get(p) || [];
+          list.push({ callback });
+          acceptors.set(p, list);
+        }
+      },
+      invalidate() { location.reload(); },
+      dispose() {}
+    };
+  };
 
   socket.onmessage = async (event) => {
     try {
       const data = JSON.parse(event.data);
+      if (data.type !== 'update') return;
 
-      if (data.type === 'update') {
-        const { path, timestamp } = data;
-        const url = path.startsWith('/') ? path : '/' + path;
-        const fullUrl = url.split('?')[0] + '?t=' + timestamp;
+      const { path, timestamp } = data;
+      const url = path.startsWith('/') ? path : '/' + path;
+      const fullUrl = url.split('?')[0] + '?t=' + timestamp;
 
-        console.log('[mini-dev] HMR update:', path);
+      console.log('[mini-dev] HMR update:', path);
 
-        // Re-import the module (browser cache-bust via ?t=)
-        try {
-          await import(/* @vite-ignore */ fullUrl);
-          console.log('[mini-dev] Module updated:', path);
-        } catch (err) {
-          console.error('[mini-dev] HMR failed for', path, err);
-          location.reload();
+      try {
+        if (/\\.css(\\?|$)/.test(url)) {
+          const pathPart = url.split('?')[0];
+          for (const link of document.querySelectorAll('link[rel="stylesheet"]')) {
+            if (link.href && link.href.includes(pathPart)) {
+              link.href = link.href.replace(/[?&]t=\\d+/, '').replace(/([?&])$/, '') + (link.href.includes('?') ? '&' : '?') + 't=' + timestamp;
+            }
+          }
+          console.log('[mini-dev] CSS updated:', path);
+          return;
         }
+        const list = acceptors.get(url);
+        if (list && list.length > 0) {
+          const newModule = await import(/* @vite-ignore */ fullUrl);
+          for (const { callback } of list) { callback(newModule); }
+          console.log('[mini-dev] Module updated:', path);
+        } else {
+          const entry = getEntryUrl();
+          if (entry) {
+            await import(/* @vite-ignore */ entry.split('?')[0] + '?t=' + timestamp);
+            console.log('[mini-dev] App refreshed:', entry);
+          } else {
+            location.reload();
+          }
+        }
+      } catch (err) {
+        console.error('[mini-dev] HMR failed for', path, err);
+        location.reload();
       }
     } catch (err) {
       console.error('[mini-dev] HMR message error', err);
     }
   };
-
-  // Expose import.meta.hot for modules that opt in
-  if (typeof import.meta !== 'undefined' && import.meta) {
-    import.meta.hot = {
-      accept(_deps, callback) {
-        if (callback) hotModuleMap.set(import.meta.url, callback);
-      },
-      invalidate() {
-        location.reload();
-      },
-      dispose(callback) {
-        hotModuleMap.set(import.meta.url + ':dispose', callback);
-      }
-    };
-  }
 })();
 `.trim();
 }

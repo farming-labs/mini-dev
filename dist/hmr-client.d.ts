@@ -1,6 +1,6 @@
 /**
  * HMR client script injected into HTML pages.
- * Runs in the browser and handles hot module replacement.
+ * Auto-injects HMR: re-imports entry on .ts/.tsx change, swaps CSS links.
  */
-export declare function getHMRClient(wsProtocol: string): string;
+export declare function getHMRClient(_wsProtocol: string): string;
 //# sourceMappingURL=hmr-client.d.ts.map

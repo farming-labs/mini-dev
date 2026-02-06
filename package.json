@@ -1,6 +1,6 @@
 {
   "name": "mini-dev",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "A minimal dev server with HMR for TypeScript/JS/CSS",
   "type": "module",
   "main": "dist/index.js",
