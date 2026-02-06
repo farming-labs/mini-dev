@@ -84,7 +84,7 @@ export class DevServer {
     return new Promise((resolve) => {
       this.httpServer!.listen(this.port, this.host, () => {
         const url = `http://localhost:${this.port}`;
-        console.log(`\n  mini-dev dev server running at ${url}\n`);
+        console.log(`\n  [mini-dev] Dev server running at ${url}\n`);
         resolve({ port: this.port, url });
       });
     });
