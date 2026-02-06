@@ -6,7 +6,6 @@
     "dev:from-source": "node ../dist/cli.js -p 3000 -r ."
   },
   "devDependencies": {
-    "mini-dev": "../"
+    "@kinfish/mini-dev": "../"
   }
-  
 }

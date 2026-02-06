@@ -5,7 +5,7 @@
 Create and start a dev server. Returns a promise that resolves to `{ server, port, url, stop }`.
 
 ```ts
-import { createDevServer } from 'mini-dev';
+import { createDevServer } from '@kinfish/mini-dev';
 
 const { server, port, url, stop } = await createDevServer({ port: 3000 });
 console.log(`Server at ${url}`);

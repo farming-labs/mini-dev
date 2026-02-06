@@ -20,17 +20,17 @@ pnpm add @kinfish/mini-dev
 ### CLI
 
 ```bash
-npx mini-dev
+npx @kinfish/mini-dev
 # Server at http://localhost:3000
 
 # Custom port and root
-npx mini-dev -p 5173 -r ./my-app
+npx @kinfish/mini-dev -p 5173 -r ./my-app
 ```
 
 ### Programmatic API
 
 ```ts
-import { createDevServer } from 'mini-dev';
+import { createDevServer } from '@kinfish/mini-dev';
 
 const { url, stop } = await createDevServer({ port: 3000 });
 console.log('Running at', url);
@@ -40,7 +40,7 @@ console.log('Running at', url);
 ### DevServer Class
 
 ```ts
-import { DevServer } from 'mini-dev';
+import { DevServer } from '@kinfish/mini-dev';
 
 const server = new DevServer({
   root: './src',
