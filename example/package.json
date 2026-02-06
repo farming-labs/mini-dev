@@ -1,0 +1,8 @@
+{
+  "name": "mini-dev-example",
+  "private": true,
+  "scripts": {
+    "dev": "mini-dev -p 3000",
+    "dev:from-source": "node ../dist/cli.js -p 3000 -r ."
+  }
+}
