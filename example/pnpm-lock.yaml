@@ -6,4 +6,8 @@ settings:
 
 importers:
 
-  .: {}
+  .:
+    devDependencies:
+      mini-dev:
+        specifier: ../
+        version: link:..
