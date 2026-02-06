@@ -9,6 +9,7 @@ export declare class DevServer {
     private host;
     private verbose;
     private ignored;
+    private label;
     private moduleGraph;
     private clients;
     private httpServer;

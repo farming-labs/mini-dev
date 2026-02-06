@@ -2,15 +2,17 @@
  * HMR client script injected into HTML pages.
  * Auto-injects HMR: re-imports entry on .ts/.tsx change, swaps CSS links.
  */
-export function getHMRClient(_wsProtocol: string): string {
+export function getHMRClient(_wsProtocol: string, label = 'MINI-DEV'): string {
+  const lbl = JSON.stringify(label);
   return `
 (function() {
+  const label = ${lbl};
   const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const socket = new WebSocket(wsProto + '//' + location.host);
 
-  socket.onopen = () => console.log('[mini-dev] HMR connected');
-  socket.onclose = () => console.log('[mini-dev] HMR disconnected');
-  socket.onerror = (e) => console.error('[mini-dev] HMR error', e);
+  socket.onopen = () => console.log('[' + label + '] HMR connected');
+  socket.onclose = () => console.log('[' + label + '] HMR disconnected');
+  socket.onerror = (e) => console.error('[' + label + '] HMR error', e);
 
   function getEntryUrl() {
     const scripts = document.querySelectorAll('script[type="module"][src]');
@@ -54,7 +56,7 @@ export function getHMRClient(_wsProtocol: string): string {
       const url = path.startsWith('/') ? path : '/' + path;
       const fullUrl = url.split('?')[0] + '?t=' + timestamp;
 
-      console.log('[mini-dev] HMR update:', path);
+      console.log('[' + label + '] HMR update:', path);
 
       try {
         if (/\\.css(\\?|$)/.test(url)) {
@@ -64,29 +66,29 @@ export function getHMRClient(_wsProtocol: string): string {
               link.href = link.href.replace(/[?&]t=\\d+/, '').replace(/([?&])$/, '') + (link.href.includes('?') ? '&' : '?') + 't=' + timestamp;
             }
           }
-          console.log('[mini-dev] CSS updated:', path);
+          console.log('[' + label + '] CSS updated:', path);
           return;
         }
         const list = acceptors.get(url);
         if (list && list.length > 0) {
           const newModule = await import(/* @vite-ignore */ fullUrl);
           for (const { callback } of list) { callback(newModule); }
-          console.log('[mini-dev] Module updated:', path);
+          console.log('[' + label + '] Module updated:', path);
         } else {
           const entry = getEntryUrl();
           if (entry) {
             await import(/* @vite-ignore */ entry.split('?')[0] + '?t=' + timestamp);
-            console.log('[mini-dev] App refreshed:', entry);
+            console.log('[' + label + '] App refreshed:', entry);
           } else {
             location.reload();
           }
         }
       } catch (err) {
-        console.error('[mini-dev] HMR failed for', path, err);
+        console.error('[' + label + '] HMR failed for', path, err);
         location.reload();
       }
     } catch (err) {
-      console.error('[mini-dev] HMR message error', err);
+      console.error('[' + label + '] HMR message error', err);
     }
   };
 })();

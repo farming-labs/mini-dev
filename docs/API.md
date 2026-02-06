@@ -31,6 +31,7 @@ new DevServer(options?: DevServerOptions)
 | `host`   | `string`                 | `'0.0.0.0'`     | Host to bind to                |
 | `verbose`| `boolean`                | `false`         | Enable verbose logging         |
 | `ignored`| `string \| RegExp \| []`  | `node_modules`  | Paths to ignore when watching  |
+| `label`  | `string`                 | `'MINI-DEV'`    | Custom label for terminal + HMR logs |
 
 ### Methods
 
@@ -47,6 +48,7 @@ mini-dev [options]
 | ------------ | -------------------------- |
 | `-p, --port` | Port (default: 3000)       |
 | `-r, --root` | Root directory (default: cwd) |
+| `-l, --label` | Dev server label (default: MINI-DEV) |
 | `-v, --verbose` | Verbose logging        |
 | `-h, --help` | Show help                  |
 

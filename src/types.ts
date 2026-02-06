@@ -12,6 +12,8 @@ export interface DevServerOptions {
   verbose?: boolean;
   /** Paths/patterns to ignore when watching. Defaults to `node_modules` */
   ignored?: string | RegExp | (string | RegExp)[];
+  /** Label for the dev server in logs/UI. Defaults to `MINI-DEV` */
+  label?: string;
 }
 
 /**

@@ -8,6 +8,6 @@ importers:
 
   .:
     devDependencies:
-      mini-dev:
+      '@farming-labs/mini-dev':
         specifier: ../
         version: link:..

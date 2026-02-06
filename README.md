@@ -25,6 +25,9 @@ npx @farming-labs/mini-dev
 
 # Custom port and root
 npx @farming-labs/mini-dev -p 5173 -r ./my-app
+
+# Custom label (default: MINI-DEV)
+npx @farming-labs/mini-dev -l MY-APP
 ```
 
 ### Programmatic API
@@ -47,6 +50,7 @@ const server = new DevServer({
   port: 3000,
   host: '0.0.0.0',
   verbose: true,
+  label: 'MY-APP', // optional, defaults to MINI-DEV
 });
 
 const { port, url } = await server.start();

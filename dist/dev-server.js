@@ -38,6 +38,7 @@ export class DevServer {
     host;
     verbose;
     ignored;
+    label;
     moduleGraph = new Map();
     clients = new Set();
     httpServer = null;
@@ -49,10 +50,11 @@ export class DevServer {
         this.host = options.host ?? '0.0.0.0';
         this.verbose = options.verbose ?? false;
         this.ignored = options.ignored ?? /node_modules/;
+        this.label = options.label ?? 'MINI-DEV';
     }
     log(...args) {
         if (this.verbose) {
-            console.log('[mini-dev]', ...args);
+            console.log(`[${this.label}]`, ...args);
         }
     }
     /**
@@ -64,7 +66,7 @@ export class DevServer {
         this.wss.on('connection', (ws) => {
             this.clients.add(ws);
             const c = { dim: '\x1b[2m', green: '\x1b[32m', reset: '\x1b[0m' };
-            console.log(`${c.dim}[HMR]${c.reset} ${c.green}client connected${c.reset} (${this.clients.size} total)`);
+            console.log(`${c.dim}[${this.label}] [HMR]${c.reset} ${c.green}client connected${c.reset} (${this.clients.size} total)`);
             ws.on('close', () => {
                 this.clients.delete(ws);
                 if (this.verbose) {
@@ -90,7 +92,7 @@ export class DevServer {
                     reset: '\x1b[0m',
                 };
                 const version = pkg.version ?? '0.0.1';
-                console.log(`\n${c.bold}${c.cyan}  mini-dev${c.reset} v${version} ${c.dim}ready in ${readyMs}ms${c.reset}\n\n` +
+                console.log(`\n${c.bold}${c.cyan}  ${this.label}${c.reset} v${version} ${c.dim}ready in ${readyMs}ms${c.reset}\n\n` +
                     `${c.green}  ➜${c.reset}  ${c.dim}Local:${c.reset}   ${url}\n` +
                     `${c.green}  ➜${c.reset}  ${c.dim}Network:${c.reset} use --host to expose\n`);
                 resolve({ port: this.port, url });
@@ -158,7 +160,7 @@ export class DevServer {
         res.end();
     }
     async serveHMRClient(res) {
-        const code = getHMRClient('ws');
+        const code = getHMRClient('ws', this.label);
         res.writeHead(200, {
             'Content-Type': 'application/javascript',
             'Cache-Control': 'no-cache',
@@ -310,12 +312,12 @@ if (typeof window !== 'undefined' && window.__MINI_DEV_HOT__) {
         const url = relative.startsWith('/') ? relative : '/' + relative;
         this.moduleGraph.delete(url);
         const c = { dim: '\x1b[2m', cyan: '\x1b[36m', yellow: '\x1b[33m', reset: '\x1b[0m' };
-        console.log(`${c.dim}[HMR]${c.reset} ${c.yellow}file changed${c.reset} ${c.cyan}${url}${c.reset}`);
+        console.log(`${c.dim}[${this.label}] [HMR]${c.reset} ${c.yellow}file changed${c.reset} ${c.cyan}${url}${c.reset}`);
         const msg = { type: 'update', path: url, timestamp: Date.now() };
         this.broadcast(msg);
         const n = this.clients.size;
         if (n > 0) {
-            console.log(`${c.dim}[HMR]${c.reset} update sent to ${n} client${n === 1 ? '' : 's'}`);
+            console.log(`${c.dim}[${this.label}] [HMR]${c.reset} update sent to ${n} client${n === 1 ? '' : 's'}`);
         }
     }
     broadcast(message) {
