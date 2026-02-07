@@ -1,6 +1,6 @@
 {
   "name": "@farming-labs/mini-dev",
-  "version": "0.0.2-beta.3",
+  "version": "0.0.2",
   "description": "A minimal dev server with HMR for TypeScript/JS/CSS",
   "type": "module",
   "main": "dist/index.js",
