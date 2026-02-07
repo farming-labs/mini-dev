@@ -14,6 +14,8 @@ export interface DevServerOptions {
     ignored?: string | RegExp | (string | RegExp)[];
     /** Label for the dev server in logs/UI. Defaults to `MINI-DEV` */
     label?: string;
+    /** Disable all logs (terminal + browser HMR). Defaults to `process.env.CI === 'true'` */
+    silent?: boolean;
 }
 /**
  * Module metadata stored in the module graph.

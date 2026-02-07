@@ -39,6 +39,7 @@ export class DevServer {
     verbose;
     ignored;
     label;
+    silent;
     moduleGraph = new Map();
     clients = new Set();
     httpServer = null;
@@ -51,9 +52,10 @@ export class DevServer {
         this.verbose = options.verbose ?? false;
         this.ignored = options.ignored ?? /node_modules/;
         this.label = options.label ?? 'MINI-DEV';
+        this.silent = options.silent ?? process.env.CI === 'true';
     }
     log(...args) {
-        if (this.verbose) {
+        if (!this.silent && this.verbose) {
             console.log(`[${this.label}]`, ...args);
         }
     }
@@ -65,13 +67,13 @@ export class DevServer {
         this.wss = new WebSocketServer({ server: this.httpServer });
         this.wss.on('connection', (ws) => {
             this.clients.add(ws);
-            const c = { dim: '\x1b[2m', green: '\x1b[32m', reset: '\x1b[0m' };
-            console.log(`${c.dim}[${this.label}] [HMR]${c.reset} ${c.green}client connected${c.reset} (${this.clients.size} total)`);
+            if (!this.silent) {
+                const c = { dim: '\x1b[2m', green: '\x1b[32m', reset: '\x1b[0m' };
+                console.log(`${c.dim}[${this.label}] [HMR]${c.reset} ${c.green}client connected${c.reset} (${this.clients.size} total)`);
+            }
             ws.on('close', () => {
                 this.clients.delete(ws);
-                if (this.verbose) {
-                    console.log(`${c.dim}[HMR]${c.reset} client disconnected`);
-                }
+                this.log('client disconnected');
             });
         });
         this.watcher = chokidar.watch(this.root, {
@@ -91,10 +93,12 @@ export class DevServer {
                     bold: '\x1b[1m',
                     reset: '\x1b[0m',
                 };
-                const version = pkg.version ?? '0.0.1';
-                console.log(`\n${c.bold}${c.cyan}  ${this.label}${c.reset} v${version} ${c.dim}ready in ${readyMs}ms${c.reset}\n\n` +
-                    `${c.green}  ➜${c.reset}  ${c.dim}Local:${c.reset}   ${url}\n` +
-                    `${c.green}  ➜${c.reset}  ${c.dim}Network:${c.reset} use --host to expose\n`);
+                if (!this.silent) {
+                    const version = pkg.version ?? '0.0.1';
+                    console.log(`\n${c.bold}${c.cyan}  ${this.label}${c.reset} v${version} ${c.dim}ready in ${readyMs}ms${c.reset}\n\n` +
+                        `${c.green}  ➜${c.reset}  ${c.dim}Local:${c.reset}   ${url}\n` +
+                        `${c.green}  ➜${c.reset}  ${c.dim}Network:${c.reset} use --host to expose\n`);
+                }
                 resolve({ port: this.port, url });
             });
         });
@@ -160,7 +164,7 @@ export class DevServer {
         res.end();
     }
     async serveHMRClient(res) {
-        const code = getHMRClient('ws', this.label);
+        const code = getHMRClient('ws', this.label, this.silent);
         res.writeHead(200, {
             'Content-Type': 'application/javascript',
             'Cache-Control': 'no-cache',
@@ -311,13 +315,18 @@ if (typeof window !== 'undefined' && window.__MINI_DEV_HOT__) {
         const relative = file.replace(this.root, '').replace(/\\/g, '/');
         const url = relative.startsWith('/') ? relative : '/' + relative;
         this.moduleGraph.delete(url);
-        const c = { dim: '\x1b[2m', cyan: '\x1b[36m', yellow: '\x1b[33m', reset: '\x1b[0m' };
-        console.log(`${c.dim}[${this.label}] [HMR]${c.reset} ${c.yellow}file changed${c.reset} ${c.cyan}${url}${c.reset}`);
+        if (!this.silent) {
+            const c = { dim: '\x1b[2m', cyan: '\x1b[36m', yellow: '\x1b[33m', reset: '\x1b[0m' };
+            console.log(`${c.dim}[${this.label}] [HMR]${c.reset} ${c.yellow}file changed${c.reset} ${c.cyan}${url}${c.reset}`);
+        }
         const msg = { type: 'update', path: url, timestamp: Date.now() };
         this.broadcast(msg);
-        const n = this.clients.size;
-        if (n > 0) {
-            console.log(`${c.dim}[${this.label}] [HMR]${c.reset} update sent to ${n} client${n === 1 ? '' : 's'}`);
+        if (!this.silent) {
+            const n = this.clients.size;
+            if (n > 0) {
+                const c = { dim: '\x1b[2m', reset: '\x1b[0m' };
+                console.log(`${c.dim}[${this.label}] [HMR]${c.reset} update sent to ${n} client${n === 1 ? '' : 's'}`);
+            }
         }
     }
     broadcast(message) {

@@ -5,6 +5,7 @@ const args = process.argv.slice(2);
 let port = 3000;
 let root = process.cwd();
 let verbose = false;
+let silent;
 let label;
 for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
@@ -19,6 +20,10 @@ for (let i = 0; i < args.length; i++) {
         case '-l':
         case '--label':
             label = args[++i];
+            break;
+        case '-s':
+        case '--silent':
+            silent = true;
             break;
         case '-v':
         case '--verbose':
@@ -36,12 +41,19 @@ Options:
   -p, --port <number>  Port to listen on (default: 3000)
   -r, --root <path>    Root directory to serve (default: cwd)
   -l, --label <name>   Dev server label in logs (default: MINI-DEV)
+  -s, --silent         Disable all logs (auto-enabled when CI=true)
   -v, --verbose        Enable verbose logging
   -h, --help           Show this help
 `);
             process.exit(0);
     }
 }
-const server = new DevServer({ root, port, verbose, ...(label && { label }) });
+const server = new DevServer({
+    root,
+    port,
+    verbose,
+    ...(label && { label }),
+    ...(silent !== undefined && { silent }),
+});
 await server.start();
 //# sourceMappingURL=cli.js.map

@@ -28,6 +28,9 @@ npx @farming-labs/mini-dev -p 5173 -r ./my-app
 
 # Custom label (default: MINI-DEV)
 npx @farming-labs/mini-dev -l MY-APP
+
+# Silent mode (no logs; auto-enabled when CI=true)
+npx @farming-labs/mini-dev -s
 ```
 
 ### Programmatic API

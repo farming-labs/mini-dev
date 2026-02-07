@@ -1,1 +1,1 @@
-{"version":3,"file":"hmr-client.d.ts","sourceRoot":"","sources":["../src/hmr-client.ts"],"names":[],"mappings":"AAAA;;;GAGG;AACH,wBAAgB,YAAY,CAAC,WAAW,EAAE,MAAM,EAAE,KAAK,SAAa,GAAG,MAAM,CA2F5E"}
+{"version":3,"file":"hmr-client.d.ts","sourceRoot":"","sources":["../src/hmr-client.ts"],"names":[],"mappings":"AAAA;;;GAGG;AACH,wBAAgB,YAAY,CAAC,WAAW,EAAE,MAAM,EAAE,KAAK,SAAa,EAAE,MAAM,UAAQ,GAAG,MAAM,CA+F5F"}

@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "mini-dev -p 3000",
+    "dev:silent": "mini-dev -p 3000 -s",
     "dev:from-source": "node ../dist/cli.js -p 3000 -r ."
   },
   "devDependencies": {
