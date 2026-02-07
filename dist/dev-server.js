@@ -93,12 +93,10 @@ export class DevServer {
                     bold: '\x1b[1m',
                     reset: '\x1b[0m',
                 };
-                if (!this.silent) {
-                    const version = pkg.version ?? '0.0.1';
-                    console.log(`\n${c.bold}${c.cyan}  ${this.label}${c.reset} v${version} ${c.dim}ready in ${readyMs}ms${c.reset}\n\n` +
-                        `${c.green}  ➜${c.reset}  ${c.dim}Local:${c.reset}   ${url}\n` +
-                        `${c.green}  ➜${c.reset}  ${c.dim}Network:${c.reset} use --host to expose\n`);
-                }
+                const version = pkg.version ?? '0.0.1';
+                console.log(`\n${c.bold}${c.cyan}  ${this.label}${c.reset} v${version} ${c.dim}ready in ${readyMs}ms${c.reset}\n\n` +
+                    `${c.green}  ➜${c.reset}  ${c.dim}Local:${c.reset}   ${url}\n` +
+                    `${c.green}  ➜${c.reset}  ${c.dim}Network:${c.reset} use --host to expose\n`);
                 resolve({ port: this.port, url });
             });
         });
