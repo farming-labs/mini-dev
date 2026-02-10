@@ -8,7 +8,7 @@ Optional `mini-dev.config.ts` or `mini-dev.config.js` in project root. CLI optio
 
 Files in `public/` are served at `/` (e.g. `public/favicon.ico` → `/favicon.ico`). No `public/` directory is required.
 
-## 404 page
+### 404 page
 
 When a path is not found, the server returns an HTML 404 page that lists available paths (root files and `public/` contents) as clickable links.
 
@@ -46,6 +46,7 @@ new DevServer(options?: DevServerOptions)
 | `label`  | `string`                 | `'MINI-DEV'`    | Custom label for terminal + HMR logs |
 | `silent` | `boolean`                | `process.env.CI === 'true'` | Disable all logs (terminal + browser) |
 | `open`   | `boolean`                | `false`                     | Open browser on start |
+| `base`   | `string`                 | —                           | Base path (e.g. `'/app/'`) so the app is served at `https://example.com/app/`; assets and routes use this path |
 
 ### Methods
 
@@ -65,6 +66,7 @@ mini-dev [options]
 | `-l, --label` | Dev server label (default: MINI-DEV) |
 | `-o, --open` | Open browser on start |
 | `--host [addr]` | Expose to network (0.0.0.0) |
+| `--base <path>` | Base path (e.g. `/app/`) for serving under a subpath |
 | `-s, --silent` | Disable all logs |
 | `-v, --verbose` | Verbose logging        |
 | `-h, --help` | Show help                  |

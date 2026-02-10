@@ -38,6 +38,9 @@ npx @farming-labs/mini-dev -o
 # Expose to network (access from other devices)
 npx @farming-labs/mini-dev --host
 
+# Serve under a subpath (e.g. https://example.com/app/)
+npx @farming-labs/mini-dev --base /app/
+
 # Silent mode (no logs; auto-enabled when CI=true)
 npx @farming-labs/mini-dev -s
 ```
@@ -81,6 +84,7 @@ export default {
   port: 5173,
   open: true,
   label: 'MY-APP',
+  // base: '/app/',  // serve at https://example.com/app/
 } satisfies Partial<DevServerOptions>;
 ```
 

@@ -12,6 +12,8 @@ export declare class DevServer {
     private label;
     private silent;
     private open;
+    private base;
+    private basePrefix;
     private moduleGraph;
     private clients;
     private httpServer;

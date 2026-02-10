@@ -18,6 +18,8 @@ export interface DevServerOptions {
   silent?: boolean;
   /** Open browser on start */
   open?: boolean;
+  /** Base path for serving under a subpath, e.g. `/app/` for https://example.com/app/ */
+  base?: string;
 }
 
 /**

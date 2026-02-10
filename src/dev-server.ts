@@ -58,6 +58,8 @@ export class DevServer {
   private label: string;
   private silent: boolean;
   private open: boolean;
+  private base: string;
+  private basePrefix: string;
   private moduleGraph = new Map<string, ModuleInfo>();
   private clients = new Set<WSWebSocket>();
   private httpServer: ReturnType<typeof createServer> | null = null;
@@ -73,6 +75,9 @@ export class DevServer {
     this.label = options.label ?? 'MINI-DEV';
     this.silent = options.silent ?? process.env.CI === 'true';
     this.open = options.open ?? false;
+    const rawBase = options.base ?? '';
+    this.base = rawBase ? (rawBase.startsWith('/') ? rawBase : '/' + rawBase).replace(/\/?$/, '/') : '';
+    this.basePrefix = this.base ? this.base.replace(/\/$/, '') : '';
   }
 
   private getNetworkUrl(): string | null {
@@ -123,7 +128,7 @@ export class DevServer {
     return new Promise((resolve) => {
       this.httpServer!.listen(this.port, this.host, () => {
         const readyMs = Date.now() - startTime;
-        const localUrl = `http://localhost:${this.port}/`;
+        const localUrl = `http://localhost:${this.port}${this.base}`;
         const networkUrl = this.getNetworkUrl();
         const c = {
           dim: '\x1b[2m',
@@ -180,32 +185,46 @@ export class DevServer {
     let url = req.url ?? '/';
     const [pathname, search] = url.split('?');
 
-    if (pathname === '/') {
-      return this.redirect(res, '/index.html');
+    let pathnameForLookup = pathname;
+    if (this.basePrefix) {
+      if (pathname === '/') {
+        return this.redirect(res, this.base);
+      }
+      if (pathname === this.basePrefix) {
+        return this.redirect(res, this.base);
+      }
+      if (!pathname.startsWith(this.basePrefix + '/')) {
+        return this.serve404(pathname, res);
+      }
+      pathnameForLookup = pathname.slice(this.basePrefix.length) || '/';
+    } else {
+      if (pathname === '/') {
+        return this.redirect(res, '/index.html');
+      }
     }
 
-    if (pathname === '/@hmr-client') {
+    if (pathnameForLookup === '/@hmr-client') {
       return this.serveHMRClient(res);
     }
 
-    const publicServed = await this.servePublic(pathname, res);
+    const publicServed = await this.servePublic(pathnameForLookup, res);
     if (publicServed) return;
 
     try {
-      const ext = extname(pathname);
+      const ext = extname(pathnameForLookup);
 
       if (ext === '.html') {
-        await this.serveHtml(pathname, res);
+        await this.serveHtml(pathnameForLookup, res);
       } else if (ext === '.ts' || ext === '.tsx') {
-        await this.serveTypeScript(pathname, res);
+        await this.serveTypeScript(pathnameForLookup, res);
       } else if (ext === '.css') {
-        await this.serveCss(pathname, res);
+        await this.serveCss(pathnameForLookup, res);
       } else {
-        await this.serveStatic(pathname, res);
+        await this.serveStatic(pathnameForLookup, res);
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      this.log('Error serving', pathname, msg);
+      this.log('Error serving', pathnameForLookup, msg);
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end(msg);
     }
@@ -244,7 +263,8 @@ export class DevServer {
       await walk(publicDir, '');
     }
 
-    return paths.sort((a, b) => a.localeCompare(b));
+    const sorted = paths.sort((a, b) => a.localeCompare(b));
+    return this.basePrefix ? sorted.map((p) => this.basePrefix + p) : sorted;
   }
 
   private async serve404(pathname: string, res: ServerResponse): Promise<void> {
@@ -252,6 +272,7 @@ export class DevServer {
     const listHtml = paths
       .map((p) => `<li><a href="${escapeHtml(p)}">${escapeHtml(p)}</a></li>`)
       .join('\n');
+    const displayPath = pathname;
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -270,7 +291,7 @@ export class DevServer {
 </head>
 <body>
   <h1>404 - Not Found</h1>
-  <p>The path <code>${escapeHtml(pathname)}</code> does not exist.</p>
+  <p>The path <code>${escapeHtml(displayPath)}</code> does not exist.</p>
   <p>Available paths you can visit:</p>
   <ul>
 ${listHtml}
@@ -319,13 +340,22 @@ ${listHtml}
 
     let html = await readFile(filePath, 'utf-8');
 
-    if (!html.includes('@hmr-client') && !html.includes('</head>')) {
-      html = html.replace('</html>', '<script type="module" src="/@hmr-client"></script></html>');
-    } else if (!html.includes('@hmr-client')) {
-      html = html.replace(
-        '</head>',
-        '<script type="module" src="/@hmr-client"></script></head>'
+    const hmrScript = `<script type="module" src="${this.base}@hmr-client"></script>`;
+    if (this.base) {
+      if (!html.includes('<base')) {
+        html = html.replace('<head>', '<head>\n  <base href="' + this.base + '">');
+      }
+      const prefixNoLead = this.basePrefix.slice(1).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const absPathRe = new RegExp(
+        `\\s(href|src)=(["'])\\/(?!\\/)(?!${prefixNoLead}\\/)`,
+        'g'
       );
+      html = html.replace(absPathRe, ` $1=$2${this.basePrefix}/`);
+    }
+    if (!html.includes('@hmr-client') && !html.includes('</head>')) {
+      html = html.replace('</html>', hmrScript + '</html>');
+    } else if (!html.includes('@hmr-client')) {
+      html = html.replace('</head>', hmrScript + '</head>');
     }
 
     res.writeHead(200, {
@@ -375,12 +405,15 @@ ${listHtml}
     const timestamp = Date.now();
 
     // Rewrite relative imports to include full path and cache-bust
+    const prefix = this.basePrefix;
+    const withBase = (p: string) => (prefix ? prefix + p : p);
+
     code = code.replace(
       /from\s+['"]([^'"]+)['"]/g,
       (_match, path: string) => {
         if (path.startsWith('.') || path.startsWith('/')) {
           const resolved = this.resolveImportPath(path, importerDir, importerPath);
-          return `from '${resolved}?t=${timestamp}'`;
+          return `from '${withBase(resolved)}?t=${timestamp}'`;
         }
         return `from '${path}'`;
       }
@@ -391,7 +424,7 @@ ${listHtml}
       (_match, path: string) => {
         if (path.startsWith('.') || path.startsWith('/')) {
           const resolved = this.resolveImportPath(path, importerDir, importerPath);
-          return `import('${resolved}?t=${timestamp}')`;
+          return `import('${withBase(resolved)}?t=${timestamp}')`;
         }
         return `import('${path}')`;
       }
@@ -402,7 +435,7 @@ ${listHtml}
       (_match, path: string) => {
         if (path.startsWith('.') || path.startsWith('/')) {
           const resolved = this.resolveImportPath(path, importerDir, importerPath);
-          return `import '${resolved}?t=${timestamp}'`;
+          return `import '${withBase(resolved)}?t=${timestamp}'`;
         }
         return `import '${path}'`;
       }
@@ -484,7 +517,8 @@ if (typeof window !== 'undefined' && window.__MINI_DEV_HOT__) {
       console.log(`${c.dim}[${this.label}] [HMR]${c.reset} ${c.yellow}file changed${c.reset} ${c.cyan}${url}${c.reset}`);
     }
 
-    const msg = { type: 'update' as const, path: url, timestamp: Date.now() };
+    const pathForClient = this.basePrefix ? this.basePrefix + url : url;
+    const msg = { type: 'update' as const, path: pathForClient, timestamp: Date.now() };
     this.broadcast(msg);
 
     if (!this.silent) {
