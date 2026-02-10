@@ -7,6 +7,7 @@ A minimal dev server with HMR (Hot Module Replacement) for TypeScript, TSX, CSS,
 - **Zero config** — Works out of the box
 - **Config file** — Optional `mini-dev.config.ts` or `mini-dev.config.js`
 - **public/ directory** — Static assets (favicon, images, robots.txt) served at `/`
+- **404 page** — Custom 404 with a list of visitable paths when a route is not found
 - **TypeScript/TSX** — On-the-fly transpilation via esbuild
 - **HMR** — Hot module replacement without full page reload
 - **Simple API** — Programmatic and CLI usage

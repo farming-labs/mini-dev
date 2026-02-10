@@ -33,6 +33,8 @@ export declare class DevServer {
     stop(): Promise<void>;
     private handleRequest;
     private redirect;
+    private listVisitablePaths;
+    private serve404;
     private servePublic;
     private serveHMRClient;
     private serveHtml;

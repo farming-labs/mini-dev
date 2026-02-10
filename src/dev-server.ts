@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { networkInterfaces } from 'node:os';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { existsSync, statSync } from 'node:fs';
 import { join, extname, dirname, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,6 +15,14 @@ import { getHMRClient } from './hmr-client.js';
 import type { DevServerOptions, ModuleInfo } from './types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -208,6 +216,71 @@ export class DevServer {
     res.end();
   }
 
+  private async listVisitablePaths(): Promise<string[]> {
+    const paths: string[] = [];
+    const skip = new Set(['node_modules', '.git', 'dist', 'public']);
+
+    try {
+      const entries = await readdir(this.root, { withFileTypes: true });
+      for (const e of entries) {
+        if (skip.has(e.name) || e.name.startsWith('.')) continue;
+        if (e.isFile()) paths.push('/' + e.name);
+        if (e.isDirectory()) paths.push('/' + e.name + '/');
+      }
+    } catch {
+      /* ignore */
+    }
+
+    const publicDir = join(this.root, 'public');
+    if (existsSync(publicDir)) {
+      const walk = async (dir: string, prefix: string) => {
+        const entries = await readdir(dir, { withFileTypes: true });
+        for (const e of entries) {
+          const rel = prefix + e.name;
+          if (e.isFile()) paths.push('/' + rel);
+          if (e.isDirectory()) await walk(join(dir, e.name), rel + '/');
+        }
+      };
+      await walk(publicDir, '');
+    }
+
+    return paths.sort((a, b) => a.localeCompare(b));
+  }
+
+  private async serve404(pathname: string, res: ServerResponse): Promise<void> {
+    const paths = await this.listVisitablePaths();
+    const listHtml = paths
+      .map((p) => `<li><a href="${escapeHtml(p)}">${escapeHtml(p)}</a></li>`)
+      .join('\n');
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>404 - Not Found</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 2rem; max-width: 640px; line-height: 1.6; color: #333; }
+    h1 { font-size: 1.25rem; color: #c00; }
+    code { background: #f0f0f0; padding: 0.2em 0.4em; border-radius: 4px; }
+    ul { margin: 1rem 0; padding-left: 1.5rem; }
+    a { color: #0066cc; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <h1>404 - Not Found</h1>
+  <p>The path <code>${escapeHtml(pathname)}</code> does not exist.</p>
+  <p>Available paths you can visit:</p>
+  <ul>
+${listHtml}
+  </ul>
+</body>
+</html>`;
+    res.writeHead(404, { 'Content-Type': 'text/html' });
+    res.end(html);
+  }
+
   private async servePublic(pathname: string, res: ServerResponse): Promise<boolean> {
     const publicDir = join(this.root, 'public');
     if (!existsSync(publicDir)) return false;
@@ -241,9 +314,7 @@ export class DevServer {
   private async serveHtml(url: string, res: ServerResponse): Promise<void> {
     const filePath = join(this.root, url.slice(1));
     if (!existsSync(filePath)) {
-      res.writeHead(404);
-      res.end('Not Found');
-      return;
+      return this.serve404(url, res);
     }
 
     let html = await readFile(filePath, 'utf-8');
@@ -269,9 +340,7 @@ export class DevServer {
     const filePath = join(this.root, cleanPath.slice(1));
 
     if (!existsSync(filePath)) {
-      res.writeHead(404);
-      res.end('Not Found');
-      return;
+      return this.serve404(cleanPath, res);
     }
 
     const code = await readFile(filePath, 'utf-8');
@@ -379,9 +448,7 @@ if (typeof window !== 'undefined' && window.__MINI_DEV_HOT__) {
   private async serveCss(url: string, res: ServerResponse): Promise<void> {
     const filePath = join(this.root, url.slice(1));
     if (!existsSync(filePath)) {
-      res.writeHead(404);
-      res.end('Not Found');
-      return;
+      return this.serve404(url, res);
     }
     const css = await readFile(filePath, 'utf-8');
     res.writeHead(200, {
@@ -394,9 +461,7 @@ if (typeof window !== 'undefined' && window.__MINI_DEV_HOT__) {
   private async serveStatic(url: string, res: ServerResponse): Promise<void> {
     const filePath = join(this.root, url.slice(1));
     if (!existsSync(filePath)) {
-      res.writeHead(404);
-      res.end('Not Found');
-      return;
+      return this.serve404(url, res);
     }
     const ext = extname(filePath);
     const contentType = MIME_TYPES[ext] ?? 'application/octet-stream';

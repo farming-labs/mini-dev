@@ -8,6 +8,10 @@ Optional `mini-dev.config.ts` or `mini-dev.config.js` in project root. CLI optio
 
 Files in `public/` are served at `/` (e.g. `public/favicon.ico` → `/favicon.ico`). No `public/` directory is required.
 
+## 404 page
+
+When a path is not found, the server returns an HTML 404 page that lists available paths (root files and `public/` contents) as clickable links.
+
 ## `createDevServer(options?)`
 
 Create and start a dev server. Returns a promise that resolves to `{ server, port, url, stop }`.
