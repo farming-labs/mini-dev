@@ -74,11 +74,37 @@ Requests to `/api/...` are proxied to `http://localhost:8080/api/...`. Path is m
 - **`start(): Promise<{ port, url }>`** — Start the server. Returns port and URL.
 - **`stop(): Promise<void>`** — Stop the server and clean up.
 
+## `createPreviewServer(options?)`
+
+Create and start a preview server for static build output (no HMR, no transpilation).
+
+```ts
+import { createPreviewServer } from '@farming-labs/mini-dev';
+
+const { server, port, url, stop } = await createPreviewServer({ root: './dist', port: 4173 });
+```
+
+### `PreviewServer` options
+
+| Option   | Type     | Default | Description |
+| -------- | -------- | ------- | ----------- |
+| `root`   | `string` | `./dist` | Root directory to serve |
+| `port`   | `number` | `4173` | Port |
+| `host`   | `string` | `127.0.0.1` | Host |
+| `base`   | `string` | — | Base path |
+| `proxy`  | same as DevServer | — | Proxy paths |
+| `open`   | `boolean` | `false` | Open browser on start |
+| `silent` | `boolean` | `process.env.CI === 'true'` | Disable logs |
+| `label`  | `string` | `'MINI-DEV preview'` | Label in logs |
+
 ## CLI
 
 ```bash
 mini-dev [options]
+mini-dev preview [options]
 ```
+
+**Commands:** `(default)` — dev server with HMR; `preview` — static build server.
 
 | Flag         | Description                |
 | ------------ | -------------------------- |

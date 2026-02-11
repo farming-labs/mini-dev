@@ -9,6 +9,7 @@ A minimal dev server with HMR (Hot Module Replacement) for TypeScript, TSX, CSS,
 - **public/ directory** — Static assets (favicon, images, robots.txt) served at `/`
 - **404 page** — Custom 404 with a list of visitable paths when a route is not found
 - **Proxy** — Forward paths (e.g. `/api`) to another server so frontend and backend can run separately
+- **Preview** — `mini-dev preview` to serve static build output (e.g. `./dist`) without HMR
 - **TypeScript/TSX** — On-the-fly transpilation via esbuild
 - **HMR** — Hot module replacement without full page reload
 - **Simple API** — Programmatic and CLI usage
@@ -44,6 +45,10 @@ npx @farming-labs/mini-dev --base /app/
 
 # Silent mode (no logs; auto-enabled when CI=true)
 npx @farming-labs/mini-dev -s
+
+# Preview: serve static build (default: ./dist on port 4173)
+npx @farming-labs/mini-dev preview
+npx @farming-labs/mini-dev preview -r ./dist -p 4173
 ```
 
 ### Programmatic API
@@ -71,6 +76,16 @@ const server = new DevServer({
 
 const { port, url } = await server.start();
 // await server.stop();
+```
+
+### Preview server
+
+```ts
+import { createPreviewServer } from '@farming-labs/mini-dev';
+
+const { url, stop } = await createPreviewServer({ root: './dist', port: 4173 });
+console.log('Preview at', url);
+// await stop();
 ```
 
 ## Config

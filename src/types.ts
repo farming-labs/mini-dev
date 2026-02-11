@@ -35,6 +35,26 @@ export interface ProxyRule {
   target: string;
 }
 
+/** Options for the preview server (static file serving only, no HMR). */
+export interface PreviewServerOptions {
+  /** Root directory to serve. Defaults to `./dist` for preview. */
+  root?: string;
+  /** Port. Defaults to `4173` */
+  port?: number;
+  /** Host. Defaults to `127.0.0.1` */
+  host?: string;
+  /** Base path, e.g. `/app/` */
+  base?: string;
+  /** Proxy paths to another server */
+  proxy?: Record<string, string> | Array<{ path: string; target: string }>;
+  /** Open browser on start */
+  open?: boolean;
+  /** Disable logs */
+  silent?: boolean;
+  /** Label in logs. Defaults to `MINI-DEV preview` */
+  label?: string;
+}
+
 /**
  * Module metadata stored in the module graph.
  */

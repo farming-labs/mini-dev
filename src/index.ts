@@ -13,7 +13,8 @@
  */
 
 export { DevServer } from './dev-server.js';
-export type { DevServerOptions, HMRMessage, ModuleInfo } from './types.js';
+export { PreviewServer } from './preview-server.js';
+export type { DevServerOptions, PreviewServerOptions, HMRMessage, ModuleInfo } from './types.js';
 
 /**
  * Create and start a dev server.
@@ -24,6 +25,23 @@ export type { DevServerOptions, HMRMessage, ModuleInfo } from './types.js';
 export async function createDevServer(options: import('./types.js').DevServerOptions = {}) {
   const { DevServer } = await import('./dev-server.js');
   const server = new DevServer(options);
+  const { port, url } = await server.start();
+  return {
+    server,
+    port,
+    url,
+    async stop() {
+      await server.stop();
+    },
+  };
+}
+
+/**
+ * Create and start a preview server for static build output.
+ */
+export async function createPreviewServer(options: import('./types.js').PreviewServerOptions = {}) {
+  const { PreviewServer } = await import('./preview-server.js');
+  const server = new PreviewServer(options);
   const { port, url } = await server.start();
   return {
     server,

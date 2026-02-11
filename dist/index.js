@@ -12,6 +12,7 @@
  * ```
  */
 export { DevServer } from './dev-server.js';
+export { PreviewServer } from './preview-server.js';
 /**
  * Create and start a dev server.
  *
@@ -21,6 +22,22 @@ export { DevServer } from './dev-server.js';
 export async function createDevServer(options = {}) {
     const { DevServer } = await import('./dev-server.js');
     const server = new DevServer(options);
+    const { port, url } = await server.start();
+    return {
+        server,
+        port,
+        url,
+        async stop() {
+            await server.stop();
+        },
+    };
+}
+/**
+ * Create and start a preview server for static build output.
+ */
+export async function createPreviewServer(options = {}) {
+    const { PreviewServer } = await import('./preview-server.js');
+    const server = new PreviewServer(options);
     const { port, url } = await server.start();
     return {
         server,

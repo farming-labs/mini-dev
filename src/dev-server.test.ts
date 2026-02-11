@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import { DevServer } from './dev-server.js';
+import { PreviewServer } from './preview-server.js';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -119,5 +120,50 @@ describe('DevServer proxy', () => {
     const html = await res.text();
     expect(html).toContain('ok');
     expect(res.headers.get('x-backend')).toBeNull();
+  });
+});
+
+describe('PreviewServer', () => {
+  const port = 3095;
+  let server: PreviewServer;
+  let root: string;
+
+  beforeAll(async () => {
+    root = await mkdtemp(join(tmpdir(), 'mini-dev-preview-'));
+    await writeFile(join(root, 'index.html'), '<html><body>Preview</body></html>');
+    await writeFile(join(root, 'asset.js'), 'console.log("built");');
+
+    server = new PreviewServer({ root, port });
+    await server.start();
+  });
+
+  afterAll(async () => {
+    await server.stop();
+    await rm(root, { recursive: true, force: true });
+  });
+
+  it('serves static files without HMR', async () => {
+    const res = await fetch(`http://localhost:${port}/index.html`);
+    expect(res.ok).toBe(true);
+    const html = await res.text();
+    expect(html).toContain('Preview');
+    expect(html).not.toContain('@hmr-client');
+  });
+
+  it('serves other static assets', async () => {
+    const res = await fetch(`http://localhost:${port}/asset.js`);
+    expect(res.ok).toBe(true);
+    expect(await res.text()).toContain('built');
+  });
+
+  it('redirects / to index.html', async () => {
+    const res = await fetch(`http://localhost:${port}/`, { redirect: 'manual' });
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toContain('index.html');
+  });
+
+  it('returns 404 for missing files', async () => {
+    const res = await fetch(`http://localhost:${port}/nonexistent.html`);
+    expect(res.status).toBe(404);
   });
 });
