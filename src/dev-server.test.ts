@@ -101,7 +101,7 @@ describe('DevServer proxy', () => {
     const res = await fetch(`http://localhost:${proxyPort}/api/users?foo=1`);
     expect(res.ok).toBe(true);
     expect(res.headers.get('x-backend')).toBe('true');
-    const data = await res.json();
+    const data = await res.json() as { path: string; method: string };
     expect(data.path).toBe('/api/users?foo=1');
     expect(data.method).toBe('GET');
   });
@@ -109,7 +109,7 @@ describe('DevServer proxy', () => {
   it('forwards subpaths under proxy path', async () => {
     const res = await fetch(`http://localhost:${proxyPort}/api/v2/items`);
     expect(res.ok).toBe(true);
-    const data = await res.json();
+    const data = await res.json() as { path: string; method: string };
     expect(data.path).toBe('/api/v2/items');
   });
 

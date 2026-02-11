@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { createServer } from 'node:http';
 import { DevServer } from './dev-server.js';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -51,6 +52,55 @@ describe('DevServer', () => {
         const js = await res.text();
         expect(js).toContain('WebSocket');
         expect(js).toContain('__MINI_DEV_HOT__');
+    });
+});
+describe('DevServer proxy', () => {
+    const proxyPort = 3096;
+    const backendPort = 3097;
+    let devServer;
+    let backend;
+    let root;
+    beforeAll(async () => {
+        root = await mkdtemp(join(tmpdir(), 'mini-dev-proxy-'));
+        await writeFile(join(root, 'index.html'), '<html><body>ok</body></html>');
+        backend = createServer((req, res) => {
+            res.writeHead(200, { 'Content-Type': 'application/json', 'X-Backend': 'true' });
+            res.end(JSON.stringify({ path: req.url, method: req.method }));
+        });
+        await new Promise((resolve) => backend.listen(backendPort, () => resolve()));
+        devServer = new DevServer({
+            root,
+            port: proxyPort,
+            verbose: false,
+            proxy: { '/api': `http://localhost:${backendPort}` },
+        });
+        await devServer.start();
+    });
+    afterAll(async () => {
+        await devServer.stop();
+        await new Promise((resolve) => backend.close(() => resolve()));
+        await rm(root, { recursive: true, force: true });
+    });
+    it('forwards matching path to target and returns response', async () => {
+        const res = await fetch(`http://localhost:${proxyPort}/api/users?foo=1`);
+        expect(res.ok).toBe(true);
+        expect(res.headers.get('x-backend')).toBe('true');
+        const data = await res.json();
+        expect(data.path).toBe('/api/users?foo=1');
+        expect(data.method).toBe('GET');
+    });
+    it('forwards subpaths under proxy path', async () => {
+        const res = await fetch(`http://localhost:${proxyPort}/api/v2/items`);
+        expect(res.ok).toBe(true);
+        const data = await res.json();
+        expect(data.path).toBe('/api/v2/items');
+    });
+    it('does not proxy non-matching paths', async () => {
+        const res = await fetch(`http://localhost:${proxyPort}/index.html`);
+        expect(res.ok).toBe(true);
+        const html = await res.text();
+        expect(html).toContain('ok');
+        expect(res.headers.get('x-backend')).toBeNull();
     });
 });
 //# sourceMappingURL=dev-server.test.js.map
