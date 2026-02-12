@@ -173,13 +173,13 @@ describe('DevServer env', () => {
         expect(js).not.toContain('SECRET_KEY');
         expect(js).not.toContain('do-not-expose');
     });
-    it('injects env script into HTML when env is enabled', async () => {
+    it('does not auto-inject env script into HTML (users add script tag if using getEnv)', async () => {
         const res = await fetch(`http://localhost:${port}/index.html`);
         expect(res.ok).toBe(true);
         const html = await res.text();
-        expect(html).toContain('@env');
+        expect(html).not.toContain('@env');
     });
-    it('does not serve /@env or inject script when env is false', async () => {
+    it('does not serve /@env when env is false', async () => {
         const noEnvRoot = await mkdtemp(join(tmpdir(), 'mini-dev-no-env-'));
         await writeFile(join(noEnvRoot, 'index.html'), '<html><head></head><body>App</body></html>');
         const noEnvServer = new DevServer({ root: noEnvRoot, port: 3093, verbose: false, env: false });

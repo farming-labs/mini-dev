@@ -1,6 +1,7 @@
 /**
- * Client-side env: reads vars exposed by the dev server's /@env script.
- * Only vars with the configured prefix (e.g. PUBLIC_) are present.
+ * Client-side env util: reads vars from the dev server's /@env payload.
+ * Add <script src="/@env"></script> (or with base e.g. /app/@env) before your app so
+ * window.__MINI_DEV_ENV__ is set. Only vars with the configured prefix (e.g. PUBLIC_) are present.
  *
  * @example
  * ```ts

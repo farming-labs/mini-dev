@@ -526,7 +526,6 @@ ${listHtml}
         }
         let html = await readFile(filePath, 'utf-8');
         const hmrScript = `<script type="module" src="${this.base}@hmr-client"></script>`;
-        const envScript = this.envPrefix !== null ? `<script src="${this.base}@env"></script>` : '';
         if (this.base) {
             if (!html.includes('<base')) {
                 html = html.replace('<head>', '<head>\n  <base href="' + this.base + '">');
@@ -534,14 +533,6 @@ ${listHtml}
             const prefixNoLead = this.basePrefix.slice(1).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const absPathRe = new RegExp(`\\s(href|src)=(["'])\\/(?!\\/)(?!${prefixNoLead}\\/)`, 'g');
             html = html.replace(absPathRe, ` $1=$2${this.basePrefix}/`);
-        }
-        if (envScript) {
-            if (html.includes('</head>')) {
-                html = html.replace('</head>', envScript + '\n</head>');
-            }
-            else {
-                html = html.replace('</html>', envScript + '</html>');
-            }
         }
         if (!html.includes('@hmr-client') && !html.includes('</head>')) {
             html = html.replace('</html>', hmrScript + '</html>');
