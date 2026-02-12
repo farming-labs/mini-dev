@@ -13,6 +13,7 @@
  */
 export { DevServer } from './dev-server.js';
 export { PreviewServer } from './preview-server.js';
+export { getEnv } from './env-client.js';
 /**
  * Create and start a dev server.
  *

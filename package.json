@@ -12,6 +12,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./client": {
+      "types": "./dist/env-client.d.ts",
+      "import": "./dist/env-client.js"
     }
   },
   "files": [

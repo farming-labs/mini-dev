@@ -30,6 +30,14 @@ export interface DevServerOptions {
         path: string;
         target: string;
     }>;
+    /**
+     * Load .env and .env.local from root and expose vars to the client.
+     * Only keys starting with the given prefix are exposed (security: avoid leaking secrets).
+     * Set to `false` to disable. Default when enabled: `{ prefix: 'PUBLIC_' }`.
+     */
+    env?: false | {
+        prefix?: string;
+    };
 }
 /** Normalized proxy rule used internally. */
 export interface ProxyRule {

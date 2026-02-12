@@ -2,9 +2,11 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import { DevServer } from './dev-server.js';
 import { PreviewServer } from './preview-server.js';
+import { parseEnvString, loadPublicEnv } from './load-env.js';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 describe('DevServer', () => {
   let server: DevServer;
@@ -165,5 +167,83 @@ describe('PreviewServer', () => {
   it('returns 404 for missing files', async () => {
     const res = await fetch(`http://localhost:${port}/nonexistent.html`);
     expect(res.status).toBe(404);
+  });
+});
+
+describe('DevServer env', () => {
+  const port = 3094;
+  let server: DevServer;
+  let root: string;
+
+  beforeAll(async () => {
+    root = await mkdtemp(join(tmpdir(), 'mini-dev-env-'));
+    await writeFile(join(root, 'index.html'), '<html><head></head><body>App</body></html>');
+    const envPath = join(root, '.env');
+    await writeFile(
+      envPath,
+      'PUBLIC_API_URL=http://localhost:8080\nSECRET_KEY=do-not-expose\nPUBLIC_APP_NAME=my-app'
+    );
+    expect(existsSync(envPath)).toBe(true);
+
+    server = new DevServer({ root: resolve(root), port, verbose: false, env: {} });
+    await server.start();
+  });
+
+  afterAll(async () => {
+    await server.stop();
+    await rm(root, { recursive: true, force: true });
+  });
+
+  it('serves /@env with only PUBLIC_ prefixed vars', async () => {
+    const res = await fetch(`http://localhost:${port}/@env`);
+    expect(res.ok).toBe(true);
+    expect(res.headers.get('content-type')).toContain('javascript');
+    const js = await res.text();
+    expect(js).toContain('__MINI_DEV_ENV__');
+    expect(js).toContain('PUBLIC_API_URL');
+    expect(js).toContain('http://localhost:8080');
+    expect(js).toContain('PUBLIC_APP_NAME');
+    expect(js).toContain('my-app');
+    expect(js).not.toContain('SECRET_KEY');
+    expect(js).not.toContain('do-not-expose');
+  });
+
+  it('does not auto-inject env script into HTML (users add script tag if using getEnv)', async () => {
+    const res = await fetch(`http://localhost:${port}/index.html`);
+    expect(res.ok).toBe(true);
+    const html = await res.text();
+    expect(html).not.toContain('@env');
+  });
+
+  it('does not serve /@env when env is false', async () => {
+    const noEnvRoot = await mkdtemp(join(tmpdir(), 'mini-dev-no-env-'));
+    await writeFile(join(noEnvRoot, 'index.html'), '<html><head></head><body>App</body></html>');
+    const noEnvServer = new DevServer({ root: noEnvRoot, port: 3093, verbose: false, env: false });
+    await noEnvServer.start();
+
+    const envRes = await fetch('http://localhost:3093/@env');
+    expect(envRes.status).toBe(404);
+
+    const htmlRes = await fetch('http://localhost:3093/index.html');
+    const html = await htmlRes.text();
+    expect(html).not.toContain('@env');
+
+    await noEnvServer.stop();
+    await rm(noEnvRoot, { recursive: true, force: true });
+  });
+});
+
+describe('load-env', () => {
+  it('parseEnvString parses KEY=value and strips quotes', () => {
+    const out = parseEnvString('A=1\nB="two"\n# comment\nC=\n');
+    expect(out).toEqual({ A: '1', B: 'two', C: '' });
+  });
+
+  it('loadPublicEnv returns only keys with prefix', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mini-dev-load-env-'));
+    await writeFile(join(root, '.env'), 'PUBLIC_X=1\nPRIVATE_Y=2\nPUBLIC_Z=3\n');
+    const env = await loadPublicEnv(root, 'PUBLIC_');
+    await rm(root, { recursive: true, force: true });
+    expect(env).toEqual({ PUBLIC_X: '1', PUBLIC_Z: '3' });
   });
 });

@@ -10,6 +10,7 @@ A minimal dev server with HMR (Hot Module Replacement) for TypeScript, TSX, CSS,
 - **404 page** — Custom 404 with a list of visitable paths when a route is not found
 - **Proxy** — Forward paths (e.g. `/api`) to another server so frontend and backend can run separately
 - **Preview** — `mini-dev preview` to serve static build output (e.g. `./dist`) without HMR
+- **Env** — Load `.env` / `.env.local` and expose **prefixed** vars to the client (e.g. `PUBLIC_*`) for security
 - **TypeScript/TSX** — On-the-fly transpilation via esbuild
 - **HMR** — Hot module replacement without full page reload
 - **Simple API** — Programmatic and CLI usage
@@ -102,6 +103,7 @@ export default {
   label: 'MY-APP',
   // base: '/app/',  // serve at https://example.com/app/
   // proxy: { '/api': 'http://localhost:8080' },  // forward /api to backend
+  // env: { prefix: 'PUBLIC_' },  // expose PUBLIC_* from .env to client (default); set env: false to disable
 } satisfies Partial<DevServerOptions>;
 ```
 
@@ -117,6 +119,29 @@ Place files in a `public/` folder at the project root; they are served at `/`:
 
 If `public/` does not exist, it is ignored.
 
+## Env (`.env`)
+
+With `env: {}` or `env: { prefix: 'PUBLIC_' }` (default prefix), the server loads `.env` and `.env.local` from the project root and serves them at **`/@env`** (only variables whose names start with the prefix). Set `env: false` to disable. Use `env: { prefix: 'VITE_' }` to match Vite’s convention.
+
+To use env in the browser, load the payload and use the **`getEnv()`** util. Add a script tag before your app so the object is available: `<script src="/@env"></script>` (or with `base`, e.g. `<script src="/app/@env"></script>`). Then in your app:
+
+```ts
+import { getEnv } from '@farming-labs/mini-dev/client';
+
+interface Env {
+  PUBLIC_API_URL?: string;
+  PUBLIC_APP_NAME?: string;
+}
+
+const env = getEnv<Env>();
+env.PUBLIC_API_URL;   // string | undefined
+env.PUBLIC_APP_NAME; // string | undefined
+```
+
+The dev server does not inject the env script automatically; you add it when you need it.
+
+
+
 ## Example
 
 See the [example](./example) directory:
@@ -126,7 +151,7 @@ cd example
 pnpm dev
 ```
 
-Edit `App.tsx` or `style.css` and save — changes apply via HMR without a full reload.
+Then open **http://localhost:3000/app/** (the example uses `base: '/app/'`). Edit `App.tsx` or `style.css` and save — changes apply via HMR without a full reload. The example uses a local `env.ts` helper so it works without relying on package resolution; in your own app you can use `import { getEnv } from '@farming-labs/mini-dev/client'` when the package is installed.
 
 ## API Reference
 

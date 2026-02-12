@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { networkInterfaces } from 'node:os';
 import { readFile, readdir } from 'node:fs/promises';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, statSync, readFileSync, realpathSync } from 'node:fs';
 import { join, extname, dirname, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -11,6 +11,7 @@ import { WebSocketServer } from 'ws';
 import chokidar from 'chokidar';
 import { transform } from 'esbuild';
 import { getHMRClient } from './hmr-client.js';
+import { loadPublicEnv } from './load-env.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 function escapeHtml(s) {
     return s
@@ -55,6 +56,8 @@ export class DevServer {
     base;
     basePrefix;
     proxyRules;
+    envPrefix;
+    publicEnv = {};
     moduleGraph = new Map();
     clients = new Set();
     httpServer = null;
@@ -73,6 +76,10 @@ export class DevServer {
         this.base = rawBase ? (rawBase.startsWith('/') ? rawBase : '/' + rawBase).replace(/\/?$/, '/') : '';
         this.basePrefix = this.base ? this.base.replace(/\/$/, '') : '';
         this.proxyRules = this.normalizeProxy(options.proxy);
+        this.envPrefix =
+            options.env === false || options.env === undefined
+                ? null
+                : (options.env?.prefix ?? 'PUBLIC_');
     }
     normalizeProxy(proxy) {
         if (!proxy)
@@ -206,12 +213,23 @@ export class DevServer {
         if (pathnameForLookup === '/@hmr-client') {
             return this.serveHMRClient(res);
         }
+        if (pathnameForLookup === '/@env' && this.envPrefix !== null) {
+            return await this.serveEnv(res);
+        }
+        if (pathnameForLookup === '/' || pathnameForLookup === '') {
+            return this.redirect(res, this.base + 'index.html');
+        }
         const proxyHandled = await this.tryProxy(pathnameForLookup, search ?? '', req, res);
         if (proxyHandled)
             return;
         const publicServed = await this.servePublic(pathnameForLookup, res);
         if (publicServed)
             return;
+        if (pathnameForLookup.startsWith('/@node_modules/')) {
+            const served = await this.serveNodeModule(pathnameForLookup, res);
+            if (served)
+                return;
+        }
         try {
             const ext = extname(pathnameForLookup);
             if (ext === '.html') {
@@ -276,6 +294,119 @@ export class DevServer {
             res.writeHead(502, { 'Content-Type': 'text/plain' });
             res.end('Bad Gateway');
             return true;
+        }
+    }
+    findPackageDir(specifier) {
+        const parts = specifier.startsWith('@') ? specifier.split('/') : [specifier.split('/')[0]];
+        if (parts.length === 0 || !parts[0])
+            return null;
+        const packageName = parts.join('/');
+        // 1) Resolve from node_modules (walk up to find node_modules/<packageName>)
+        for (let dir = this.root; dir; dir = dirname(dir)) {
+            const nm = join(dir, 'node_modules');
+            if (!existsSync(nm))
+                continue;
+            const pkgDir = join(nm, ...parts);
+            const pkgJsonPath = join(pkgDir, 'package.json');
+            if (!existsSync(pkgJsonPath))
+                continue;
+            try {
+                return realpathSync(pkgDir);
+            }
+            catch {
+                return pkgDir;
+            }
+        }
+        // 2) Fallback: when app lives inside the package (e.g. example/ in this repo),
+        //    the package has no node_modules copy of itself; treat an ancestor dir as the package
+        //    if its package.json has "name" === packageName.
+        for (let dir = this.root; dir; dir = dirname(dir)) {
+            const pkgJsonPath = join(dir, 'package.json');
+            if (!existsSync(pkgJsonPath))
+                continue;
+            try {
+                const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'));
+                if (pkg.name === packageName)
+                    return realpathSync(dir);
+            }
+            catch {
+                /* ignore */
+            }
+        }
+        return null;
+    }
+    resolveBareSpecifier(specifier, _importerPath) {
+        try {
+            const slash = specifier.indexOf('/');
+            const packageName = slash > 0 && (specifier.startsWith('@') ? slash > 1 : true)
+                ? specifier.slice(0, slash)
+                : specifier;
+            const exportSubpath = slash > 0 ? specifier.slice(slash + 1) : undefined;
+            const packageDir = this.findPackageDir(packageName);
+            if (!packageDir)
+                return null;
+            const pkgPath = join(packageDir, 'package.json');
+            const pkgJson = readFileSync(pkgPath, 'utf-8');
+            const pkg = JSON.parse(pkgJson);
+            const exp = pkg.exports;
+            let entry;
+            const exportKey = exportSubpath ? './' + exportSubpath : '.';
+            if (exp?.[exportKey]) {
+                entry = exp[exportKey].import ?? exp[exportKey].default;
+            }
+            if (!entry && !exportSubpath) {
+                if (exp?.['.'])
+                    entry = exp['.'].import ?? exp['.'].default;
+                if (!entry)
+                    entry = pkg.main;
+            }
+            if (!entry)
+                return null;
+            const entrySubpath = entry.replace(/^\.\//, '').replace(/\\/g, '/');
+            return { packageName, entrySubpath };
+        }
+        catch {
+            return null;
+        }
+    }
+    async serveNodeModule(pathnameForLookup, res) {
+        const rest = pathnameForLookup.slice('/@node_modules/'.length).replace(/^\//, '');
+        const parts = rest.split('/');
+        let specifier;
+        let subpath;
+        if (parts[0]?.startsWith('@') && parts.length >= 2) {
+            specifier = parts[0] + '/' + parts[1];
+            subpath = parts.slice(2).join('/');
+        }
+        else if (parts.length >= 1) {
+            specifier = parts[0];
+            subpath = parts.slice(1).join('/');
+        }
+        else {
+            return false;
+        }
+        try {
+            const packageRoot = this.findPackageDir(specifier);
+            if (!packageRoot)
+                return false;
+            const filePath = resolve(packageRoot, subpath);
+            if (relative(packageRoot, filePath).startsWith('..')) {
+                return false;
+            }
+            if (!existsSync(filePath) || !statSync(filePath).isFile())
+                return false;
+            const ext = extname(filePath);
+            const contentType = MIME_TYPES[ext] ?? 'application/javascript';
+            const data = await readFile(filePath);
+            res.writeHead(200, {
+                'Content-Type': contentType,
+                'Cache-Control': 'no-cache',
+            });
+            res.end(data);
+            return true;
+        }
+        catch {
+            return false;
         }
     }
     async listVisitablePaths() {
@@ -376,6 +507,18 @@ ${listHtml}
         });
         res.end(code);
     }
+    async serveEnv(res) {
+        if (Object.keys(this.publicEnv).length === 0 && this.envPrefix !== null) {
+            this.publicEnv = await loadPublicEnv(this.root, this.envPrefix);
+        }
+        const json = JSON.stringify(this.publicEnv);
+        const code = `window.__MINI_DEV_ENV__=${json};`;
+        res.writeHead(200, {
+            'Content-Type': 'application/javascript',
+            'Cache-Control': 'no-cache',
+        });
+        res.end(code);
+    }
     async serveHtml(url, res) {
         const filePath = join(this.root, url.slice(1));
         if (!existsSync(filePath)) {
@@ -383,6 +526,7 @@ ${listHtml}
         }
         let html = await readFile(filePath, 'utf-8');
         const hmrScript = `<script type="module" src="${this.base}@hmr-client"></script>`;
+        const envScript = this.envPrefix !== null ? `<script src="${this.base}@env"></script>` : '';
         if (this.base) {
             if (!html.includes('<base')) {
                 html = html.replace('<head>', '<head>\n  <base href="' + this.base + '">');
@@ -390,6 +534,14 @@ ${listHtml}
             const prefixNoLead = this.basePrefix.slice(1).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const absPathRe = new RegExp(`\\s(href|src)=(["'])\\/(?!\\/)(?!${prefixNoLead}\\/)`, 'g');
             html = html.replace(absPathRe, ` $1=$2${this.basePrefix}/`);
+        }
+        if (envScript) {
+            if (html.includes('</head>')) {
+                html = html.replace('</head>', envScript + '\n</head>');
+            }
+            else {
+                html = html.replace('</html>', envScript + '</html>');
+            }
         }
         if (!html.includes('@hmr-client') && !html.includes('</head>')) {
             html = html.replace('</html>', hmrScript + '</html>');
@@ -437,27 +589,20 @@ ${listHtml}
         // Rewrite relative imports to include full path and cache-bust
         const prefix = this.basePrefix;
         const withBase = (p) => (prefix ? prefix + p : p);
-        code = code.replace(/from\s+['"]([^'"]+)['"]/g, (_match, path) => {
+        const resolveImport = (path) => {
             if (path.startsWith('.') || path.startsWith('/')) {
                 const resolved = this.resolveImportPath(path, importerDir, importerPath);
-                return `from '${withBase(resolved)}?t=${timestamp}'`;
+                return withBase(resolved) + '?t=' + timestamp;
             }
-            return `from '${path}'`;
-        });
-        code = code.replace(/import\s+\(['"]([^'"]+)['"]\)/g, (_match, path) => {
-            if (path.startsWith('.') || path.startsWith('/')) {
-                const resolved = this.resolveImportPath(path, importerDir, importerPath);
-                return `import('${withBase(resolved)}?t=${timestamp}')`;
+            const bare = this.resolveBareSpecifier(path, importerPath);
+            if (bare) {
+                return withBase('/@node_modules/' + bare.packageName + '/' + bare.entrySubpath) + '?t=' + timestamp;
             }
-            return `import('${path}')`;
-        });
-        code = code.replace(/import\s+['"]([^'"]+)['"]/g, (_match, path) => {
-            if (path.startsWith('.') || path.startsWith('/')) {
-                const resolved = this.resolveImportPath(path, importerDir, importerPath);
-                return `import '${withBase(resolved)}?t=${timestamp}'`;
-            }
-            return `import '${path}'`;
-        });
+            return path;
+        };
+        code = code.replace(/from\s+['"]([^'"]+)['"]/g, (_match, path) => `from '${resolveImport(path)}'`);
+        code = code.replace(/import\s+\(['"]([^'"]+)['"]\)/g, (_match, path) => `import('${resolveImport(path)}')`);
+        code = code.replace(/import\s+['"]([^'"]+)['"]/g, (_match, path) => `import '${resolveImport(path)}'`);
         // Inject HMR context at start (so import.meta.hot exists before user code runs)
         const hmrInject = `
 if (typeof window !== 'undefined' && window.__MINI_DEV_HOT__) {

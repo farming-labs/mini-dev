@@ -48,6 +48,31 @@ new DevServer(options?: DevServerOptions)
 | `open`   | `boolean`                | `false`                     | Open browser on start |
 | `base`   | `string`                 | —                           | Base path (e.g. `'/app/'`) so the app is served at `https://example.com/app/`; assets and routes use this path |
 | `proxy`  | `Record<string, string> \| Array<{ path, target }>` | — | Forward matching paths to another server (e.g. `{ '/api': 'http://localhost:8080' }`). Longest path match wins. |
+| `env`    | `false \| { prefix?: string }` | — | Load `.env` / `.env.local` and expose vars with the given prefix to the client (default prefix `PUBLIC_`). Set `false` to disable. Only prefixed vars are exposed. |
+
+### Env
+
+Load `.env` and `.env.local` from the project root. Only variables whose names **start with the prefix** (default `PUBLIC_`) are exposed to the browser at `window.__MINI_DEV_ENV__`. This prevents secrets from leaking into client code.
+
+```ts
+// .env
+PUBLIC_API_URL=http://localhost:8080
+SECRET_KEY=do-not-put-here
+
+// In browser: window.__MINI_DEV_ENV__.PUBLIC_API_URL
+```
+
+Use **`getEnv<T>()`** for type-safe access in your app. In browser code, import from the **`/client`** subpath:
+
+```ts
+import { getEnv } from '@farming-labs/mini-dev/client';
+
+interface Env { PUBLIC_API_URL?: string; }
+const env = getEnv<Env>();
+env.PUBLIC_API_URL; // string | undefined
+```
+
+HTML pages get a `<script src="/@env"></script>` (or with base, `src="/app/@env"`) so the object is available before your scripts. Set `env: false` to disable; use `env: { prefix: 'VITE_' }` to match Vite’s convention.
 
 ### Proxy
 

@@ -27,6 +27,12 @@ export interface DevServerOptions {
    * First matching path (longest first) is used. Path is matched against the logical path (under base if set).
    */
   proxy?: Record<string, string> | Array<{ path: string; target: string }>;
+  /**
+   * Load .env and .env.local from root and expose vars to the client.
+   * Only keys starting with the given prefix are exposed (security: avoid leaking secrets).
+   * Set to `false` to disable. Default when enabled: `{ prefix: 'PUBLIC_' }`.
+   */
+  env?: false | { prefix?: string };
 }
 
 /** Normalized proxy rule used internally. */

@@ -15,6 +15,8 @@ export declare class DevServer {
     private base;
     private basePrefix;
     private proxyRules;
+    private envPrefix;
+    private publicEnv;
     private moduleGraph;
     private clients;
     private httpServer;
@@ -38,10 +40,14 @@ export declare class DevServer {
     private handleRequest;
     private redirect;
     private tryProxy;
+    private findPackageDir;
+    private resolveBareSpecifier;
+    private serveNodeModule;
     private listVisitablePaths;
     private serve404;
     private servePublic;
     private serveHMRClient;
+    private serveEnv;
     private serveHtml;
     private serveTypeScript;
     private transformImports;

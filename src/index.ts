@@ -14,6 +14,7 @@
 
 export { DevServer } from './dev-server.js';
 export { PreviewServer } from './preview-server.js';
+export { getEnv } from './env-client.js';
 export type { DevServerOptions, PreviewServerOptions, HMRMessage, ModuleInfo } from './types.js';
 
 /**
