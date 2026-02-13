@@ -142,6 +142,10 @@ The dev server does not inject the env script automatically; you add it when you
 
 
 
+## Use Cases
+
+See [docs/USE_CASES.md](./docs/USE_CASES.md) for scenarios where mini-dev fits: prototyping, component showcases, micro-frontends, CI preview, learning, internal tools, and more.
+
 ## Example
 
 See the [example](./example) directory:
